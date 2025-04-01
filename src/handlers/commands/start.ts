@@ -5,10 +5,8 @@ export function setupStartCommand({ bot }: CommandContext) {
     const chatId = msg.chat.id;
     const keyboard = {
       keyboard: [
-        [{ text: BUTTONS.CATEGORIZE }],
-        [{ text: BUTTONS.STATISTICS }],
-        [{ text: BUTTONS.MANAGE_CATEGORIES }],
-        [{ text: BUTTONS.CLEAR_HISTORY }],
+        [{ text: BUTTONS.CATEGORIZE }, { text: BUTTONS.STATISTICS }],
+        [{ text: BUTTONS.MANAGE_CATEGORIES }, { text: BUTTONS.HELP }],
       ],
       resize_keyboard: true,
     };

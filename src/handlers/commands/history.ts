@@ -33,8 +33,8 @@ async function clearHistory(context: CommandContext, chatId: number) {
 export function setupHistoryCommands(context: CommandContext) {
   const { bot } = context;
 
-  // Обработчик команды очистки истории
-  bot.onText(/Очистить историю/, async (msg) => {
+  // Update the command handler to match both text and slash command
+  bot.onText(/\/clear|Очистить историю/, async (msg) => {
     const chatId = msg.chat.id;
     await clearHistory(context, chatId);
   });

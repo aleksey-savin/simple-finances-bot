@@ -1,9 +1,10 @@
 import TelegramBot from "node-telegram-bot-api";
 import { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import * as schema from "../db/schema"; // Import your schema
 
 export interface CommandContext {
   bot: TelegramBot;
-  db: BetterSQLite3Database;
+  db: BetterSQLite3Database<typeof schema>;
 }
 
 export interface CommandHandlers {
@@ -26,6 +27,7 @@ export const BUTTONS = {
   STATISTICS: "Статистика",
   CLEAR_HISTORY: "Очистить историю",
   MANAGE_CATEGORIES: "Управление категориями",
+  HELP: "Помощь",
 } as const;
 
 export const CALLBACKS = {

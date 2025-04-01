@@ -1,7 +1,8 @@
 import { CommandContext, BUTTONS } from "../types";
 
 export function setupHelpCommand({ bot }: CommandContext) {
-  bot.onText(/\/help/, (msg) => {
+  // Match both the /help command and the "Помощь" button text
+  bot.onText(new RegExp(`\\/help|${BUTTONS.HELP}`), (msg) => {
     const chatId = msg.chat.id;
     const helpText = `
 Как пользоваться ботом:
@@ -19,12 +20,13 @@ export function setupHelpCommand({ bot }: CommandContext) {
 4. Кнопка "${BUTTONS.MANAGE_CATEGORIES}":
    Управление своими категориями расходов
 
-5. Кнопка "${BUTTONS.CLEAR_HISTORY}":
-   Удаление всей истории расходов
+5. Кнопка "${BUTTONS.HELP}":
+   Показывает эту справку
 
 Дополнительные команды:
 /start - Перезапустить бота
 /help - Показать эту справку
+/clear - Очистить историю расходов (будьте осторожны!)
     `;
 
     bot.sendMessage(chatId, helpText);

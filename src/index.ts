@@ -5,13 +5,18 @@ import { setupCommands } from "./handlers/commands";
 import dotenv from "dotenv";
 import path from "path";
 import * as fs from "fs";
+import * as schema from "./db/schema"; // Import your schema
 
 dotenv.config();
 
+// Get token and provide type assertion
 const TOKEN = process.env.BOT_TOKEN;
 if (!TOKEN) {
   throw new Error("BOT_TOKEN must be provided!");
 }
+
+// Use a clean token variable that's definitely not undefined
+const botToken: string = TOKEN;
 
 // Используем путь к базе данных из переменных окружения или по умолчанию
 const dbPath =
@@ -24,23 +29,65 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const sqlite = new Database(dbPath);
-const db = drizzle(sqlite);
+let sqlite: Database.Database;
+let db: ReturnType<typeof drizzle<typeof schema>>;
+let bot: TelegramBot;
 
-const bot = new TelegramBot(TOKEN, { polling: true });
+function setupBot() {
+  console.log("Setting up bot...");
 
-const context = { bot, db };
-const handlers = setupCommands(context);
+  // Initialize database
+  sqlite = new Database(dbPath);
+  db = drizzle(sqlite, { schema }); // Pass schema to drizzle
 
-// Настраиваем обработчики
-handlers.setupCallbacks();
-handlers.setupMessageHandlers();
+  // Initialize bot with the token that we know is not undefined
+  bot = new TelegramBot(botToken, { polling: true });
 
-console.log("Bot started successfully!");
+  const context = { bot, db };
+  const handlers = setupCommands(context);
 
-// Обработка ошибок
+  // Set up handlers
+  handlers.setupCallbacks();
+  handlers.setupMessageHandlers();
+
+  console.log("Bot started successfully!");
+
+  return { bot, db, sqlite };
+}
+
+// Set up the bot
+const { bot: runningBot, db: runningDb, sqlite: runningSqlite } = setupBot();
+
+// Handle shutdown gracefully
+function shutdown() {
+  console.log("Shutting down bot...");
+  if (runningBot) {
+    runningBot.stopPolling();
+  }
+  if (runningSqlite) {
+    runningSqlite.close();
+  }
+  console.log("Bot shutdown complete");
+}
+
+// Handle process termination
+process.on("SIGINT", () => {
+  console.log("Received SIGINT signal");
+  shutdown();
+  process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+  console.log("Received SIGTERM signal");
+  shutdown();
+  process.exit(0);
+});
+
+// Handle uncaught exceptions and rejections
 process.on("uncaughtException", (error) => {
   console.error("Uncaught Exception:", error);
+  shutdown();
+  process.exit(1);
 });
 
 process.on("unhandledRejection", (error) => {
