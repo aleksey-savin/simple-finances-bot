@@ -4,10 +4,30 @@
 source /scripts/utils/check-prerequisites.sh
 
 # Конфигурация
-BACKUP_DIR="/opt/backups/simple-finances-bot/pre-deploy"
-APP_DATA_DIR="/opt/simple-finances-bot/data"
+BACKUP_DIR="/opt/backups/telegram-bot/pre-deploy"
+APP_DIR="/opt/simple-finances-bot"  # Основная директория приложения
+APP_DATA_DIR="$APP_DIR/data"       # Директория с данными
 WORK_DIR="/opt/actions-runner/_work/simple-finances-bot/simple-finances-bot"
-LOG_FILE="/var/log/simple-finances-bot-deploy.log"
+LOG_FILE="/var/log/telegram-bot-deploy.log"
+
+# Создаем необходимые директории с правильными правами
+setup_directories() {
+    # Проверяем, существуют ли директории
+    if [ ! -d "$APP_DIR" ] || [ ! -d "$APP_DATA_DIR" ] || [ ! -d "$BACKUP_DIR" ]; then
+        echo "Required directories don't exist. Please run init-server.sh first"
+        echo "Or run these commands manually:"
+        echo "sudo mkdir -p $APP_DIR $APP_DATA_DIR $BACKUP_DIR"
+        echo "sudo chown -R github-runner:github-runner $APP_DIR"
+        echo "sudo chown -R github-runner:github-runner $BACKUP_DIR"
+        exit 1
+    fi
+
+    # Проверяем права доступа
+    if [ ! -w "$APP_DIR" ] || [ ! -w "$APP_DATA_DIR" ] || [ ! -w "$BACKUP_DIR" ]; then
+        echo "Insufficient permissions. Please check directory permissions"
+        exit 1
+    fi
+}
 
 # Функция для логирования
 log() {
@@ -70,13 +90,16 @@ check_container_health() {
 main() {
     log "🚀 Starting deployment process..."
 
-    # Проверяем prerequisites
-    log "🔍 Checking prerequisites..."
-    check_prerequisites
-    if [ $? -ne 0 ]; then
-        log "❌ Prerequisites check failed"
-        exit 1
-    fi
+        # Проверяем директории
+        setup_directories
+
+        # Проверяем prerequisites
+        log "🔍 Checking prerequisites..."
+        check_prerequisites
+        if [ $? -ne 0 ]; then
+            log "❌ Prerequisites check failed"
+            exit 1
+        fi
 
     # Создаем бэкап
     log "📦 Creating backup..."

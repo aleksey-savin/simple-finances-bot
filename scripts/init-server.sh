@@ -9,13 +9,15 @@ echo "🚀 Starting server initialization..."
 
 # Определяем директории
 BACKUP_DIR="/opt/backups/telegram-bot/pre-deploy"
-APP_DATA_DIR="/opt/telegram-bot/data"
-SCRIPTS_DIR="/scripts"  # Обновленный путь
+APP_DIR="/opt/simple-finances-bot"
+APP_DATA_DIR="$APP_DIR/data"
+SCRIPTS_DIR="/scripts"
 RUNNER_DIR="/opt/actions-runner"
 RUNNER_WORK_DIR="$RUNNER_DIR/_work"
 
 echo "📁 Creating directories..."
 mkdir -p $BACKUP_DIR
+mkdir -p $APP_DIR
 mkdir -p $APP_DATA_DIR
 mkdir -p $SCRIPTS_DIR
 mkdir -p $RUNNER_WORK_DIR
@@ -23,13 +25,13 @@ mkdir -p $RUNNER_WORK_DIR
 echo "👤 Setting up permissions..."
 # Устанавливаем владельца
 chown -R github-runner:github-runner /opt/backups
-chown -R github-runner:github-runner /opt/telegram-bot
+chown -R github-runner:github-runner $APP_DIR
 chown -R github-runner:github-runner $SCRIPTS_DIR
 chown -R github-runner:github-runner $RUNNER_DIR
 
 # Устанавливаем права
 chmod -R 755 /opt/backups
-chmod -R 755 /opt/telegram-bot
+chmod -R 755 $APP_DIR
 chmod -R 755 $SCRIPTS_DIR
 chmod -R 755 $RUNNER_DIR
 
@@ -44,7 +46,7 @@ chmod 644 $APP_DATA_DIR/expenses.db
 echo "✅ Checking results..."
 echo "Directory permissions:"
 ls -la /opt/backups/telegram-bot
-ls -la /opt/telegram-bot
+ls -la $APP_DIR
 ls -la $SCRIPTS_DIR
 ls -la $RUNNER_DIR
 
