@@ -1,55 +1,86 @@
-# Simple Finances Bot
+## Server Scripts
 
-## Deployment
+All maintenance scripts are located in `/scripts` directory:
 
-### Prerequisites
-- Docker
-- Docker Compose
+### Main Scripts
+- `init-server.sh` - Initialize server and set up permissions
+- `deploy.sh` - Deploy the application
+- `backup.sh` - Create database backup
+- `rollback.sh` - Rollback to previous version
 
-### Setup
-1. Clone the repository:
+### Usage
+
+Initialize server (first time or after system changes):
 ```bash
-git clone https://github.com/aleksey-savin/simple-finances-bot.git
-cd simple-finances-bot
-```
-2. Modify the .env.example file and save it as .env
-3. Run deploy.sh script:
-```bash
-chmod +x deploy.sh
-./deploy.sh
+sudo /scripts/init-server.sh
 ```
 
-## CI/CD Setup
-
-### Prerequisites
-- Docker and Docker Compose installed on VM
-- GitHub repository access
-- Self-hosted runner access
-
-### Setting up the runner
-1. Create github-runner user:
+Deploy application:
 ```bash
-sudo useradd -m -s /bin/bash github-runner
-sudo usermod -aG docker github-runner
+/scripts/deploy.sh
 ```
 
-2. Install the runner:
+Create backup:
 ```bash
-chmod +x install-runner.sh
-sudo ./install-runner.sh
+/scripts/backup.sh
 ```
 
-3. Check runner status:
+Rollback to previous version:
 ```bash
-sudo systemctl status github-runner
+/scripts/rollback.sh list          # List available backups
+/scripts/rollback.sh latest        # Rollback to latest backup
+/scripts/rollback.sh <backup-file> # Rollback to specific backup
+```
+
+### Directory Structure
+```
+/
+├── opt/
+│   ├── backups/telegram-bot/   # Backups
+│   ├── telegram-bot/           # Application data
+│   └── actions-runner/         # GitHub Actions
+└── scripts/                    # Maintenance scripts
+    ├── init-server.sh
+    ├── deploy.sh
+    ├── backup.sh
+    ├── rollback.sh
+    └── utils/
+```
+
+### Permissions
+- All scripts are owned by github-runner
+- Scripts are executable (755)
+- Only init-server.sh requires sudo
+```
+
+Также обновим GitHub Actions workflow, чтобы использовать новые пути:
+
+```yaml
+# .github/workflows/deploy.yml
+# ... остальной код остается прежним ...
+
+      - name: Check prerequisites
+        run: |
+          source /scripts/utils/check-prerequisites.sh
+          check_prerequisites
 ```
 
 ### Deployment
-The bot will be automatically deployed when:
-- Push to main branch
-- Manual trigger through GitHub Actions
+After initialization, you can deploy:
 
-### Monitoring
-- Check GitHub Actions tab for deployment status
-- View logs: `docker compose logs -f`
-- Check runner status: `sudo systemctl status github-runner`
+```bash
+./deploy.sh
+```
+
+### Maintenance
+To check or fix permissions after system updates:
+
+```bash
+sudo ./init-server.sh
+```
+
+### Troubleshooting
+If you encounter permission issues:
+1. Check the logs: `docker compose logs`
+2. Verify permissions: `ls -la /opt/telegram-bot/data`
+3. Run initialization again: `sudo ./init-server.sh`

@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# Подключаем вспомогательные скрипты
+source /scripts/utils/check-prerequisites.sh
+
+echo "🔍 Checking prerequisites..."
+check_prerequisites
+
+echo "🚀 Starting deployment..."
+
 # Проверяем наличие .env файла
 if [ ! -f .env ]; then
     echo "Error: .env file not found!"
@@ -25,4 +33,4 @@ sleep 5
 # Проверяем логи на наличие ошибок
 docker compose logs
 
-echo "Deployment completed! Use 'docker compose logs -f' to view logs"
+echo "✅ Deployment completed"
