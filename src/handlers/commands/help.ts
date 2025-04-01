@@ -27,6 +27,7 @@ export function setupHelpCommand({ bot }: CommandContext) {
 /start - Перезапустить бота
 /help - Показать эту справку
 /clear - Очистить историю расходов (будьте осторожны!)
+/export - Экспортировать все ваши данные в CSV-файл
     `;
 
     bot.sendMessage(chatId, helpText);

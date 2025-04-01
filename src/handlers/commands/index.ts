@@ -6,6 +6,7 @@ import { setupExpenseHandler } from "./expenses";
 import { setupCategoryCommands } from "./categories";
 import { setupHistoryCommands } from "./history";
 import { setupCallbackHandlers } from "../callbacks";
+import { setupExportCommand } from "./export";
 
 export function setupCommands(context: CommandContext): CommandHandlers {
   // Настраиваем обработчики команд
@@ -15,6 +16,7 @@ export function setupCommands(context: CommandContext): CommandHandlers {
   setupExpenseHandler(context);
   setupCategoryCommands(context);
   setupHistoryCommands(context);
+  setupExportCommand(context);
 
   // Настраиваем обработчики callback-запросов
   const callbackHandlers = setupCallbackHandlers(context);
