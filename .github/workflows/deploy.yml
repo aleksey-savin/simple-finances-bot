@@ -5,71 +5,152 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  BACKUP_DIR: /opt/backups/simple-finances-bot/pre-deploy
+
 jobs:
   deploy:
     runs-on: self-hosted
 
     steps:
+      - name: Prepare workspace
+        run: |
+          sudo mkdir -p $BACKUP_DIR
+          sudo chown -R github-runner:github-runner .
+          sudo chmod -R 777 $BACKUP_DIR
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      - name: Check Docker status
-        run: |
-          docker info
-          docker compose version
-
-      - name: Create .env file
-        run: |
-          echo "BOT_TOKEN=${{ secrets.BOT_TOKEN }}" > .env
-
-      - name: Backup database
+      - name: Create backup timestamp
+        id: backup-timestamp
         run: |
           timestamp=$(date +%Y%m%d_%H%M%S)
-          mkdir -p backups
+          echo "timestamp=$timestamp" >> $GITHUB_OUTPUT
+          echo "DEPLOY_TIMESTAMP=$timestamp" >> $GITHUB_ENV
+
+      - name: Backup current state
+        id: backup
+        run: |
           if [ -f data/expenses.db ]; then
-            cp data/expenses.db "backups/expenses_${timestamp}.db"
+            cp data/expenses.db "$BACKUP_DIR/expenses_${{ env.DEPLOY_TIMESTAMP }}.db"
+            cp compose.yaml "$BACKUP_DIR/compose_${{ env.DEPLOY_TIMESTAMP }}.yaml"
+            echo "backup_created=true" >> $GITHUB_OUTPUT
+            echo "✅ Pre-deploy backup created"
+          else
+            echo "backup_created=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No database file found to backup"
           fi
-        continue-on-error: true
+
+      - name: Setup environment
+        run: |
+          echo "BOT_TOKEN=${{ secrets.BOT_TOKEN }}" > .env
 
       - name: Stop running containers
         run: docker compose down
         continue-on-error: true
 
-      - name: Remove old images
-        run: docker image prune -af
-        continue-on-error: true
-
-      - name: Build and start containers
+      - name: Build and deploy
+        id: deploy
         run: |
-          docker compose build --no-cache
-          docker compose up -d
+          echo "Starting deployment..."
 
-      - name: Check containers
-        run: |
-          sleep 10
-          docker compose ps
-          docker compose logs
+          if docker compose up -d --build; then
+            echo "deployment_success=true" >> $GITHUB_OUTPUT
+            echo "✅ Deployment successful"
+          else
+            echo "deployment_success=false" >> $GITHUB_OUTPUT
+            echo "❌ Deployment failed"
+            exit 1
+          fi
 
       - name: Health check
+        id: health
         run: |
-          max_attempts=5
-          attempt=1
-          while [ $attempt -le $max_attempts ]; do
-            if docker compose ps | grep -q "finance-bot.*Up"; then
-              echo "Container is running"
-              exit 0
-            fi
-            echo "Attempt $attempt: Container not ready yet..."
-            sleep 10
-            attempt=$((attempt+1))
-          done
-          echo "Container failed to start properly"
-          docker compose logs
-          exit 1
+          echo "Waiting for container to start..."
+          sleep 10
 
-      - name: Cleanup old backups
-        if: always()
+          if docker compose ps | grep -q "Up"; then
+            echo "health_check=true" >> $GITHUB_OUTPUT
+            echo "✅ Container is healthy"
+          else
+            echo "health_check=false" >> $GITHUB_OUTPUT
+            echo "❌ Container health check failed"
+            exit 1
+          fi
+
+    outputs:
+      timestamp: ${{ steps.backup-timestamp.outputs.timestamp }}
+      backup_created: ${{ steps.backup.outputs.backup_created }}
+      deployment_success: ${{ steps.deploy.outputs.deployment_success }}
+      health_check: ${{ steps.health.outputs.health_check }}
+
+  rollback:
+    needs: deploy
+    if: failure()
+    runs-on: self-hosted
+
+    steps:
+      - name: Check backup existence
+        id: check-backup
         run: |
-          find backups -name "expenses_*.db" -mtime +7 -delete
-        continue-on-error: true
+          if [ -f "$BACKUP_DIR/expenses_${{ needs.deploy.outputs.timestamp }}.db" ]; then
+            echo "backup_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "backup_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Perform rollback
+        if: steps.check-backup.outputs.backup_exists == 'true'
+        run: |
+          echo "Starting rollback process..."
+
+          # Останавливаем текущие контейнеры
+          docker compose down
+
+          # Восстанавливаем базу данных из бэкапа
+          cp "$BACKUP_DIR/expenses_${{ needs.deploy.outputs.timestamp }}.db" data/expenses.db
+
+          # Восстанавливаем compose.yaml если нужно
+          if [ -f "$BACKUP_DIR/compose_${{ needs.deploy.outputs.timestamp }}.yaml" ]; then
+            cp "$BACKUP_DIR/compose_${{ needs.deploy.outputs.timestamp }}.yaml" compose.yaml
+          fi
+
+          # Перезапускаем контейнеры
+          docker compose up -d
+
+          echo "✅ Rollback completed"
+
+      - name: Notify about rollback
+        run: |
+          if [ "${{ steps.check-backup.outputs.backup_exists }}" == "true" ]; then
+            echo "✅ Rollback was successful"
+          else
+            echo "⚠️ Rollback was not possible - no backup found"
+          fi
+
+  cleanup:
+    needs: [deploy, rollback]
+    if: always()
+    runs-on: self-hosted
+
+    steps:
+      - name: Cleanup old backups
+        run: |
+          # Оставляем только последние 5 бэкапов
+          cd $BACKUP_DIR
+          ls -t expenses_*.db | tail -n +6 | xargs -r rm
+          ls -t compose_*.yaml | tail -n +6 | xargs -r rm
+
+      - name: Notify deployment status
+        run: |
+          if [ "${{ needs.deploy.outputs.deployment_success }}" == "true" ] && [ "${{ needs.deploy.outputs.health_check }}" == "true" ]; then
+            echo "✅ Deployment completed successfully"
+          else
+            if [ "${{ steps.check-backup.outputs.backup_exists }}" == "true" ]; then
+              echo "⚠️ Deployment failed but successfully rolled back"
+            else
+              echo "❌ Deployment failed and rollback was not possible"
+            fi
+          fi
