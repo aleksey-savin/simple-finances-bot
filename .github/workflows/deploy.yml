@@ -15,9 +15,19 @@ jobs:
     steps:
       - name: Prepare workspace
         run: |
-          sudo mkdir -p $BACKUP_DIR
-          sudo chown -R github-runner:github-runner .
-          sudo chmod -R 777 $BACKUP_DIR
+          # Используем существующую директорию без sudo
+          mkdir -p data
+          # Проверяем наличие backup директории
+          if [ ! -d "$BACKUP_DIR" ]; then
+            echo "❌ Backup directory not found. Please run setup script first"
+            exit 1
+          fi
+
+          # Проверяем права доступа
+          if [ ! -w "$BACKUP_DIR" ]; then
+            echo "❌ Cannot write to backup directory. Please check permissions"
+            exit 1
+          fi
 
       - uses: actions/checkout@v3
         with:
