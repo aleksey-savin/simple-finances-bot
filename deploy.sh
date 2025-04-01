@@ -25,4 +25,4 @@ sleep 5
 # Проверяем логи на наличие ошибок
 docker compose logs
 
-echo "Deployment completed! Use 'docker-compose logs -f' to view logs"
+echo "Deployment completed! Use 'docker compose logs -f' to view logs"

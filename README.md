@@ -51,5 +51,5 @@ The bot will be automatically deployed when:
 
 ### Monitoring
 - Check GitHub Actions tab for deployment status
-- View logs: `docker-compose logs -f`
+- View logs: `docker compose logs -f`
 - Check runner status: `sudo systemctl status github-runner`
