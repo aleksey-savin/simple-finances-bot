@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import { Migration, migrations } from "./index";
+import { loggers } from "../../utils/logger";
 
 export class Migrator {
   private db: Database.Database;
@@ -9,6 +10,7 @@ export class Migrator {
   }
 
   async initialize() {
+    loggers.db.debug("Creating migrations table if not exists");
     // Создаем таблицу для отслеживания версии БД
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS migrations (
@@ -23,28 +25,30 @@ export class Migrator {
     const result = this.db
       .prepare("SELECT version FROM migrations ORDER BY version DESC LIMIT 1")
       .get();
-    return result ? (result as { version: number }).version : 0;
+    const version = result ? (result as { version: number }).version : 0;
+    loggers.db.debug("Current database version", { version });
+    return version;
   }
 
   async migrate() {
     await this.initialize();
     const currentVersion = await this.getCurrentVersion();
-    console.log(`Current database version: ${currentVersion}`);
+    loggers.db.info(`Database migration started`, { currentVersion });
 
     const pendingMigrations = migrations
       .filter((m) => m.version > currentVersion)
       .sort((a, b) => a.version - b.version);
 
     if (pendingMigrations.length === 0) {
-      console.log("Database is up to date");
+      loggers.db.info("Database is up to date");
       return;
     }
 
-    console.log(`Applying ${pendingMigrations.length} migration(s)...`);
+    loggers.db.info(`Applying migrations`, { count: pendingMigrations.length });
 
     for (const migration of pendingMigrations) {
       try {
-        console.log(`Applying migration version ${migration.version}...`);
+        loggers.db.info(`Applying migration`, { version: migration.version });
 
         // Начинаем транзакцию
         this.db.exec("BEGIN TRANSACTION;");
@@ -60,28 +64,32 @@ export class Migrator {
         // Завершаем транзакцию
         this.db.exec("COMMIT;");
 
-        console.log(
-          `Successfully applied migration version ${migration.version}`,
-        );
+        loggers.db.info(`Migration successfully applied`, {
+          version: migration.version,
+        });
       } catch (error) {
         // В случае ошибки откатываем транзакцию
         this.db.exec("ROLLBACK;");
-        console.error(
-          `Error applying migration version ${migration.version}:`,
-          error,
-        );
+        loggers.db.error(`Error applying migration`, {
+          version: migration.version,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
         throw error;
       }
     }
 
     const newVersion = await this.getCurrentVersion();
-    console.log(`Database migrated to version ${newVersion}`);
+    loggers.db.info(`Database migration completed`, {
+      fromVersion: currentVersion,
+      toVersion: newVersion,
+    });
   }
 
   async rollback(targetVersion?: number) {
     const currentVersion = await this.getCurrentVersion();
     if (currentVersion === 0) {
-      console.log("No migrations to rollback");
+      loggers.db.info("No migrations to rollback");
       return;
     }
 
@@ -91,9 +99,17 @@ export class Migrator {
       )
       .sort((a, b) => b.version - a.version);
 
+    loggers.db.info(`Rolling back migrations`, {
+      count: migrationsToRollback.length,
+      fromVersion: currentVersion,
+      toVersion: targetVersion || 0,
+    });
+
     for (const migration of migrationsToRollback) {
       try {
-        console.log(`Rolling back migration version ${migration.version}...`);
+        loggers.db.info(`Rolling back migration`, {
+          version: migration.version,
+        });
 
         this.db.exec("BEGIN TRANSACTION;");
 
@@ -107,17 +123,24 @@ export class Migrator {
 
         this.db.exec("COMMIT;");
 
-        console.log(
-          `Successfully rolled back migration version ${migration.version}`,
-        );
+        loggers.db.info(`Successfully rolled back migration`, {
+          version: migration.version,
+        });
       } catch (error) {
         this.db.exec("ROLLBACK;");
-        console.error(
-          `Error rolling back migration version ${migration.version}:`,
-          error,
-        );
+        loggers.db.error(`Error rolling back migration`, {
+          version: migration.version,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
         throw error;
       }
     }
+
+    const newVersion = await this.getCurrentVersion();
+    loggers.db.info(`Database rollback completed`, {
+      fromVersion: currentVersion,
+      toVersion: newVersion,
+    });
   }
 }

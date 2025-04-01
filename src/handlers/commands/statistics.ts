@@ -1,6 +1,7 @@
 import { CommandContext } from "../types";
 import { eq, and, sql } from "drizzle-orm";
 import { expenses } from "../../db/schema";
+import { loggers } from "../../utils/logger";
 
 export interface CategoryStat {
   category: string | null;
@@ -169,7 +170,10 @@ export function setupStatisticsCommands(context: CommandContext) {
 
       await bot.answerCallbackQuery(query.id);
     } catch (error) {
-      console.error("Error getting statistics:", error);
+      loggers.expenses.error(`Error getting statistics`, {
+        userId: chatId.toString(),
+        error: error instanceof Error ? error.message : String(error),
+      });
       await bot.answerCallbackQuery(query.id, {
         text: "❌ Ошибка при получении статистики",
         show_alert: true,

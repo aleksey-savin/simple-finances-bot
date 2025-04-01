@@ -5,6 +5,7 @@ import { createObjectCsvStringifier } from "csv-writer";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { loggers } from "../../utils/logger";
 
 export async function exportUserData(
   context: CommandContext,
@@ -81,7 +82,11 @@ export async function exportUserData(
 
     await bot.sendMessage(chatId, "✅ Экспорт данных успешно завершен!");
   } catch (error) {
-    console.error("Error exporting data:", error);
+    loggers.export.error(`Error exporting data`, {
+      userId: chatId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     await bot.sendMessage(
       chatId,
       "❌ Произошла ошибка при экспорте данных. Попробуйте позже.",

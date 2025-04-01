@@ -101,6 +101,35 @@ The bot uses SQLite with automatic migrations:
   npm run db:rollback [targetVersion]
   ```
 
+## Logging
+
+The application uses structured logging based on the Winston library. Logs are saved in the `logs/` directory in the following files:
+
+- `application-YYYY-MM-DD.log` - general application logs
+- `error-YYYY-MM-DD.log` - errors only
+- `exceptions.log` - uncaught exceptions
+
+### Log Levels
+
+- `error` - Critical errors requiring attention
+- `warn` - Warnings that don't interrupt operation
+- `info` - Important information about application operation
+- `debug` - Detailed debugging information (available only in development mode)
+
+### Log Analysis
+
+Logs are stored in JSON format, which makes them easy to analyze with tools such as:
+
+- `jq` for console analysis: `cat logs/application-2025-01-01.log | jq '.level=="error"'`
+- ELK stack (Elasticsearch, Logstash, Kibana) for advanced analytics
+- Other log analysis tools: Graylog, Loki, etc.
+
+### Log Level Configuration
+
+The logging level is determined by the NODE_ENV environment variable:
+- In `production` mode, messages of level `info` and above are logged
+- In other modes, all messages including `debug` are logged
+
 ## License
 
 [MIT License](LICENSE)

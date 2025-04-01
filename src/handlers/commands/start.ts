@@ -1,8 +1,13 @@
 import { CommandContext, BUTTONS } from "../types";
+import { loggers } from "../../utils/logger";
 
 export function setupStartCommand({ bot }: CommandContext) {
   bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
+    loggers.bot.info(`Bot started by user`, {
+      userId: chatId.toString(),
+    });
+
     const keyboard = {
       keyboard: [
         [{ text: BUTTONS.CATEGORIZE }, { text: BUTTONS.STATISTICS }],

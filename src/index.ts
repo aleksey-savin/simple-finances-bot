@@ -5,7 +5,8 @@ import { setupCommands } from "./handlers/commands";
 import dotenv from "dotenv";
 import path from "path";
 import * as fs from "fs";
-import * as schema from "./db/schema"; // Import your schema
+import * as schema from "./db/schema";
+import { loggers } from "./utils/logger";
 
 dotenv.config();
 
@@ -34,11 +35,11 @@ let db: ReturnType<typeof drizzle<typeof schema>>;
 let bot: TelegramBot;
 
 function setupBot() {
-  console.log("Setting up bot...");
+  loggers.system.info("Setting up bot...");
 
   // Initialize database
   sqlite = new Database(dbPath);
-  db = drizzle(sqlite, { schema }); // Pass schema to drizzle
+  db = drizzle(sqlite, { schema });
 
   // Initialize bot with the token that we know is not undefined
   bot = new TelegramBot(botToken, { polling: true });
@@ -50,7 +51,7 @@ function setupBot() {
   handlers.setupCallbacks();
   handlers.setupMessageHandlers();
 
-  console.log("Bot started successfully!");
+  loggers.system.info("Bot started successfully!", { dbPath });
 
   return { bot, db, sqlite };
 }
@@ -60,14 +61,14 @@ const { bot: runningBot, db: runningDb, sqlite: runningSqlite } = setupBot();
 
 // Handle shutdown gracefully
 function shutdown() {
-  console.log("Shutting down bot...");
+  loggers.system.info("Shutting down bot...");
   if (runningBot) {
     runningBot.stopPolling();
   }
   if (runningSqlite) {
     runningSqlite.close();
   }
-  console.log("Bot shutdown complete");
+  loggers.system.info("Bot shutdown complete");
 }
 
 // Handle process termination
@@ -85,11 +86,17 @@ process.on("SIGTERM", () => {
 
 // Handle uncaught exceptions and rejections
 process.on("uncaughtException", (error) => {
-  console.error("Uncaught Exception:", error);
+  loggers.system.error("Uncaught Exception", {
+    error: error.message,
+    stack: error.stack,
+  });
   shutdown();
   process.exit(1);
 });
 
-process.on("unhandledRejection", (error) => {
-  console.error("Unhandled Rejection:", error);
+process.on("unhandledRejection", (reason, promise) => {
+  loggers.system.error("Unhandled Rejection", {
+    reason: reason instanceof Error ? reason.message : reason,
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
 });

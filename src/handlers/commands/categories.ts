@@ -2,6 +2,7 @@ import { CommandContext } from "../types";
 import { eq, and, isNull } from "drizzle-orm";
 import { expenses, userCategories } from "../../db/schema";
 import { BUTTONS } from "../types";
+import { loggers } from "../../utils/logger";
 
 export const CATEGORY_ACTIONS = {
   ADD: "add_cat",
@@ -71,7 +72,10 @@ export async function handleCategories(
       );
     }
   } catch (error) {
-    console.error("Error in handleCategories:", error);
+    loggers.expenses.error(`Error categorizing expense`, {
+      userId: chatId.toString(),
+      error: error instanceof Error ? error.message : String(error),
+    });
     await bot.sendMessage(
       chatId,
       "❌ Произошла ошибка при обработке категорий",
@@ -210,7 +214,10 @@ export function setupCategoryCommands(context: CommandContext) {
         if (error?.code === "SQLITE_CONSTRAINT") {
           await bot.sendMessage(chatId, "❌ Такая категория уже существует");
         } else {
-          console.error("Error adding category:", error);
+          loggers.expenses.error(`Error adding category`, {
+            userId: chatId.toString(),
+            error: error instanceof Error ? error.message : String(error),
+          });
           await bot.sendMessage(chatId, "❌ Ошибка при добавлении категории");
         }
       } finally {
