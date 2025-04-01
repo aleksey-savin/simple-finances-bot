@@ -4,7 +4,7 @@ import Database from "better-sqlite3";
 import { setupCommands } from "./handlers/commands";
 import dotenv from "dotenv";
 import path from "path";
-import { fs } from "fs";
+import * as fs from "fs";
 
 dotenv.config();
 
