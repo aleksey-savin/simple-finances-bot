@@ -14,9 +14,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check Docker status
+        run: |
+          docker info
+          docker-compose version
+
       - name: Create .env file
         run: |
           echo "BOT_TOKEN=${{ secrets.BOT_TOKEN }}" > .env
+
+      - name: Backup database
+        run: |
+          timestamp=$(date +%Y%m%d_%H%M%S)
+          mkdir -p backups
+          if [ -f data/expenses.db ]; then
+            cp data/expenses.db "backups/expenses_${timestamp}.db"
+          fi
+        continue-on-error: true
 
       - name: Stop running containers
         run: docker-compose down
@@ -36,3 +50,26 @@ jobs:
           sleep 10
           docker-compose ps
           docker-compose logs
+
+      - name: Health check
+        run: |
+          max_attempts=5
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            if docker-compose ps | grep -q "finance-bot.*Up"; then
+              echo "Container is running"
+              exit 0
+            fi
+            echo "Attempt $attempt: Container not ready yet..."
+            sleep 10
+            attempt=$((attempt+1))
+          done
+          echo "Container failed to start properly"
+          docker-compose logs
+          exit 1
+
+      - name: Cleanup old backups
+        if: always()
+        run: |
+          find backups -name "expenses_*.db" -mtime +7 -delete
+        continue-on-error: true
