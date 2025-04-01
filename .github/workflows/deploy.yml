@@ -1,0 +1,38 @@
+name: Deploy Bot
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Create .env file
+        run: |
+          echo "BOT_TOKEN=${{ secrets.BOT_TOKEN }}" > .env
+
+      - name: Stop running containers
+        run: docker-compose down
+        continue-on-error: true
+
+      - name: Remove old images
+        run: docker image prune -af
+        continue-on-error: true
+
+      - name: Build and start containers
+        run: |
+          docker-compose build --no-cache
+          docker-compose up -d
+
+      - name: Check containers
+        run: |
+          sleep 10
+          docker-compose ps
+          docker-compose logs
