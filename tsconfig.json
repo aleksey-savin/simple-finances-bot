@@ -10,7 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "typeRoots": ["./node_modules/@types"],
-    "types": ["node", "node-telegram-bot-api"]
+    "types": ["node", "node-telegram-bot-api", "jest"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules"]
