@@ -4,6 +4,7 @@ import Database from "better-sqlite3";
 import { setupCommands } from "./handlers/commands";
 import dotenv from "dotenv";
 import path from "path";
+import { fs } from "fs";
 
 dotenv.config();
 
@@ -12,9 +13,16 @@ if (!TOKEN) {
   throw new Error("BOT_TOKEN must be provided!");
 }
 
+// Используем путь к базе данных из переменных окружения или по умолчанию
 const dbPath =
   process.env.DB_PATH || path.join(__dirname, "../data/expenses.db");
 console.log("Using database at:", dbPath);
+
+// Создаем директорию для базы данных если её нет
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
 
 const sqlite = new Database(dbPath);
 const db = drizzle(sqlite);

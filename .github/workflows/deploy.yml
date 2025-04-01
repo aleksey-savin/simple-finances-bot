@@ -7,6 +7,7 @@ on:
 
 env:
   BACKUP_DIR: /opt/backups/simple-finances-bot/pre-deploy
+  APP_DATA_DIR: /opt/simple-finances-bot/data # Постоянная директория для данных
 
 jobs:
   deploy:
@@ -15,17 +16,12 @@ jobs:
     steps:
       - name: Prepare workspace
         run: |
-          # Используем существующую директорию без sudo
-          mkdir -p data
-          # Проверяем наличие backup директории
-          if [ ! -d "$BACKUP_DIR" ]; then
-            echo "❌ Backup directory not found. Please run setup script first"
-            exit 1
-          fi
+          # Создаем постоянную директорию для данных если её нет
+          mkdir -p $APP_DATA_DIR
 
-          # Проверяем права доступа
-          if [ ! -w "$BACKUP_DIR" ]; then
-            echo "❌ Cannot write to backup directory. Please check permissions"
+          # Проверяем backup директорию
+          if [ ! -d "$BACKUP_DIR" ]; then
+            echo "❌ Backup directory not found"
             exit 1
           fi
 
@@ -43,9 +39,8 @@ jobs:
       - name: Backup current state
         id: backup
         run: |
-          if [ -f data/expenses.db ]; then
-            cp data/expenses.db "$BACKUP_DIR/expenses_${{ env.DEPLOY_TIMESTAMP }}.db"
-            cp compose.yaml "$BACKUP_DIR/compose_${{ env.DEPLOY_TIMESTAMP }}.yaml"
+          if [ -f "$APP_DATA_DIR/expenses.db" ]; then
+            cp "$APP_DATA_DIR/expenses.db" "$BACKUP_DIR/expenses_${{ env.DEPLOY_TIMESTAMP }}.db"
             echo "backup_created=true" >> $GITHUB_OUTPUT
             echo "✅ Pre-deploy backup created"
           else
@@ -56,6 +51,7 @@ jobs:
       - name: Setup environment
         run: |
           echo "BOT_TOKEN=${{ secrets.BOT_TOKEN }}" > .env
+          echo "DB_PATH=$APP_DATA_DIR/expenses.db" >> .env
 
       - name: Stop running containers
         run: docker compose down
@@ -95,72 +91,3 @@ jobs:
       backup_created: ${{ steps.backup.outputs.backup_created }}
       deployment_success: ${{ steps.deploy.outputs.deployment_success }}
       health_check: ${{ steps.health.outputs.health_check }}
-
-  rollback:
-    needs: deploy
-    if: failure()
-    runs-on: self-hosted
-
-    steps:
-      - name: Check backup existence
-        id: check-backup
-        run: |
-          if [ -f "$BACKUP_DIR/expenses_${{ needs.deploy.outputs.timestamp }}.db" ]; then
-            echo "backup_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "backup_exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Perform rollback
-        if: steps.check-backup.outputs.backup_exists == 'true'
-        run: |
-          echo "Starting rollback process..."
-
-          # Останавливаем текущие контейнеры
-          docker compose down
-
-          # Восстанавливаем базу данных из бэкапа
-          cp "$BACKUP_DIR/expenses_${{ needs.deploy.outputs.timestamp }}.db" data/expenses.db
-
-          # Восстанавливаем compose.yaml если нужно
-          if [ -f "$BACKUP_DIR/compose_${{ needs.deploy.outputs.timestamp }}.yaml" ]; then
-            cp "$BACKUP_DIR/compose_${{ needs.deploy.outputs.timestamp }}.yaml" compose.yaml
-          fi
-
-          # Перезапускаем контейнеры
-          docker compose up -d
-
-          echo "✅ Rollback completed"
-
-      - name: Notify about rollback
-        run: |
-          if [ "${{ steps.check-backup.outputs.backup_exists }}" == "true" ]; then
-            echo "✅ Rollback was successful"
-          else
-            echo "⚠️ Rollback was not possible - no backup found"
-          fi
-
-  cleanup:
-    needs: [deploy, rollback]
-    if: always()
-    runs-on: self-hosted
-
-    steps:
-      - name: Cleanup old backups
-        run: |
-          # Оставляем только последние 5 бэкапов
-          cd $BACKUP_DIR
-          ls -t expenses_*.db | tail -n +6 | xargs -r rm
-          ls -t compose_*.yaml | tail -n +6 | xargs -r rm
-
-      - name: Notify deployment status
-        run: |
-          if [ "${{ needs.deploy.outputs.deployment_success }}" == "true" ] && [ "${{ needs.deploy.outputs.health_check }}" == "true" ]; then
-            echo "✅ Deployment completed successfully"
-          else
-            if [ "${{ steps.check-backup.outputs.backup_exists }}" == "true" ]; then
-              echo "⚠️ Deployment failed but successfully rolled back"
-            else
-              echo "❌ Deployment failed and rollback was not possible"
-            fi
-          fi
