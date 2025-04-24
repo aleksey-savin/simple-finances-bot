@@ -25,8 +25,11 @@ export function setupStatisticsCallback(context: CommandContext) {
       case PERIOD_ACTIONS.WEEK:
         period = "week";
         break;
-      case PERIOD_ACTIONS.MONTH:
-        period = "month";
+      case PERIOD_ACTIONS.THIS_MONTH:
+        period = "this_month";
+        break;
+      case PERIOD_ACTIONS.PREVIOUS_MONTH:
+        period = "previous_month";
         break;
       default:
         return;
@@ -42,7 +45,11 @@ export function setupStatisticsCallback(context: CommandContext) {
           [
             { text: "📅 День", callback_data: PERIOD_ACTIONS.DAY },
             { text: "📅 Неделя", callback_data: PERIOD_ACTIONS.WEEK },
-            { text: "📅 Месяц", callback_data: PERIOD_ACTIONS.MONTH },
+            { text: "📅 Этот месяц", callback_data: PERIOD_ACTIONS.THIS_MONTH },
+            {
+              text: "📅 Предыдущий месяц",
+              callback_data: PERIOD_ACTIONS.PREVIOUS_MONTH,
+            },
           ],
         ],
       };
