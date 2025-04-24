@@ -42,10 +42,10 @@ export function setupStatisticsCallback(context: CommandContext) {
       // Добавляем клавиатуру с периодами
       const keyboard = {
         inline_keyboard: [
+          [{ text: "📅 День", callback_data: PERIOD_ACTIONS.DAY }],
+          [{ text: "📅 Неделя", callback_data: PERIOD_ACTIONS.WEEK }],
+          [{ text: "📅 Этот месяц", callback_data: PERIOD_ACTIONS.THIS_MONTH }],
           [
-            { text: "📅 День", callback_data: PERIOD_ACTIONS.DAY },
-            { text: "📅 Неделя", callback_data: PERIOD_ACTIONS.WEEK },
-            { text: "📅 Этот месяц", callback_data: PERIOD_ACTIONS.THIS_MONTH },
             {
               text: "📅 Предыдущий месяц",
               callback_data: PERIOD_ACTIONS.PREVIOUS_MONTH,
