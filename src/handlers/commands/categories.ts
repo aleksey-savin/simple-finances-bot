@@ -31,7 +31,9 @@ export async function getUserCategories(
     .from(userCategories)
     .where(eq(userCategories.userId, userId));
 
-  return categories.map((cat) => cat.name);
+  return categories
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((cat) => cat.name);
 }
 
 export async function handleCategories(
@@ -171,7 +173,7 @@ export function setupCategoryCommands(context: CommandContext) {
           },
         ],
         [{ text: "📋 Список категорий", callback_data: CATEGORY_ACTIONS.LIST }],
-        [{ text: "🔙 Отмена", callback_data: CATEGORY_ACTIONS.CANCEL }],
+        [{ text: "🔙 Закрыть", callback_data: CATEGORY_ACTIONS.CANCEL }],
       ],
     };
 
