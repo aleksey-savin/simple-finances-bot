@@ -151,13 +151,15 @@ async function showPeriodSelector(bot: CommandContext["bot"], chatId: number) {
   const keyboard = {
     inline_keyboard: [
       [
-        { text: "За сегодня", callback_data: PERIOD_ACTIONS.DAY },
-        { text: "За неделю", callback_data: PERIOD_ACTIONS.WEEK },
-        { text: "За этот месяц", callback_data: PERIOD_ACTIONS.THIS_MONTH },
-        {
-          text: "За прошлый месяц",
-          callback_data: PERIOD_ACTIONS.PREVIOUS_MONTH,
-        },
+        [{ text: "За сегодня", callback_data: PERIOD_ACTIONS.DAY }],
+        [{ text: "За неделю", callback_data: PERIOD_ACTIONS.WEEK }],
+        [{ text: "За этот месяц", callback_data: PERIOD_ACTIONS.THIS_MONTH }],
+        [
+          {
+            text: "За прошлый месяц",
+            callback_data: PERIOD_ACTIONS.PREVIOUS_MONTH,
+          },
+        ],
       ],
     ],
   };
