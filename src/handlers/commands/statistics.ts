@@ -1,4 +1,4 @@
-import { CommandContext } from "../types";
+import { CALLBACKS, CommandContext } from "../types";
 import { eq, and, sql } from "drizzle-orm";
 import { expenses } from "../../db/schema";
 import { loggers } from "../../utils/logger";
@@ -13,28 +13,56 @@ export interface Statistics {
   byCategory: CategoryStat[];
 }
 
-export type StatsPeriod = "day" | "week" | "month";
+export type StatsPeriod = "day" | "week" | "this_month" | "previous_month";
 
 export const PERIOD_ACTIONS = {
   DAY: "stats_day",
   WEEK: "stats_week",
-  MONTH: "stats_month",
+  THIS_MONTH: "stats_this_month",
+  PREVIOUS_MONTH: "stats_previous_month",
 } as const;
 
-function getDateFilter(period: StatsPeriod): string {
-  const date = new Date();
+function getDateFilter(period: StatsPeriod): { start: string; end?: string } {
+  const now = new Date();
+
   switch (period) {
-    case "day":
-      date.setHours(0, 0, 0, 0);
-      break;
-    case "week":
-      date.setDate(date.getDate() - 7);
-      break;
-    case "month":
-      date.setMonth(date.getMonth() - 1);
-      break;
+    case "day": {
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      return { start: start.toISOString() };
+    }
+
+    case "week": {
+      const start = new Date(now);
+      start.setDate(start.getDate() - 7);
+      return { start: start.toISOString() };
+    }
+
+    case "this_month": {
+      const start = new Date(now);
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+      return { start: start.toISOString() };
+    }
+
+    case "previous_month": {
+      // Start: First day of previous month at 00:00:00
+      const start = new Date(now);
+      start.setMonth(start.getMonth() - 1);
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+
+      // End: First day of current month at 00:00:00
+      const end = new Date(now);
+      end.setDate(1);
+      end.setHours(0, 0, 0, 0);
+
+      return {
+        start: start.toISOString(),
+        end: end.toISOString(),
+      };
+    }
   }
-  return date.toISOString();
 }
 
 export async function getStatistics(
@@ -42,14 +70,20 @@ export async function getStatistics(
   userId: string,
   period: StatsPeriod,
 ): Promise<Statistics> {
-  const dateFilter = getDateFilter(period);
+  const dateRange = getDateFilter(period);
+
+  // Build the date condition based on start and optional end date
+  let dateCondition = sql`date >= ${dateRange.start}`;
+  if (dateRange.end) {
+    dateCondition = sql`date >= ${dateRange.start} AND date < ${dateRange.end}`;
+  }
 
   const totalExpenses = await db
     .select({
       sum: sql`COALESCE(sum(${expenses.amount}), 0)`.mapWith(Number),
     })
     .from(expenses)
-    .where(and(eq(expenses.userId, userId), sql`date >= ${dateFilter}`));
+    .where(and(eq(expenses.userId, userId), dateCondition));
 
   const categoryStats = await db
     .select({
@@ -57,7 +91,7 @@ export async function getStatistics(
       sum: sql`COALESCE(sum(${expenses.amount}), 0)`.mapWith(Number),
     })
     .from(expenses)
-    .where(and(eq(expenses.userId, userId), sql`date >= ${dateFilter}`))
+    .where(and(eq(expenses.userId, userId), dateCondition))
     .groupBy(expenses.category);
 
   return {
@@ -73,7 +107,8 @@ export async function formatStatistics(
   const periodText = {
     day: "за сегодня",
     week: "за неделю",
-    month: "за месяц",
+    this_month: "за этот месяц",
+    previous_month: "за прошлый месяц",
   }[period];
 
   const date = new Date();
@@ -81,6 +116,8 @@ export async function formatStatistics(
     day: date.toLocaleDateString(),
     week: `${new Date(date.getTime() - 7 * 24 * 60 * 60 * 1000).toLocaleDateString()} - ${date.toLocaleDateString()}`,
     month: `${new Date(date.getTime() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString()} - ${date.toLocaleDateString()}`,
+    this_month: `${new Date(date.getFullYear(), date.getMonth(), 1).toLocaleDateString()} - ${date.toLocaleDateString()}`,
+    previous_month: `${new Date(date.getFullYear(), date.getMonth() - 1, 1).toLocaleDateString()} - ${new Date(date.getFullYear(), date.getMonth(), 0).toLocaleDateString()}`,
   }[period];
 
   let message = `📊 Статистика расходов ${periodText}\n`;
@@ -116,7 +153,11 @@ async function showPeriodSelector(bot: CommandContext["bot"], chatId: number) {
       [
         { text: "За сегодня", callback_data: PERIOD_ACTIONS.DAY },
         { text: "За неделю", callback_data: PERIOD_ACTIONS.WEEK },
-        { text: "За месяц", callback_data: PERIOD_ACTIONS.MONTH },
+        { text: "За этот месяц", callback_data: PERIOD_ACTIONS.THIS_MONTH },
+        {
+          text: "За прошлый месяц",
+          callback_data: PERIOD_ACTIONS.PREVIOUS_MONTH,
+        },
       ],
     ],
   };
@@ -143,7 +184,7 @@ export function setupStatisticsCommands(context: CommandContext) {
     const chatId = query.message.chat.id;
     const messageId = query.message.message_id;
 
-    let period: "day" | "week" | "month";
+    let period: "day" | "week" | "this_month" | "previous_month";
     switch (query.data) {
       case PERIOD_ACTIONS.DAY:
         period = "day";
@@ -151,8 +192,11 @@ export function setupStatisticsCommands(context: CommandContext) {
       case PERIOD_ACTIONS.WEEK:
         period = "week";
         break;
-      case PERIOD_ACTIONS.MONTH:
-        period = "month";
+      case PERIOD_ACTIONS.THIS_MONTH:
+        period = "this_month";
+        break;
+      case PERIOD_ACTIONS.PREVIOUS_MONTH:
+        period = "previous_month";
         break;
       default:
         return;
